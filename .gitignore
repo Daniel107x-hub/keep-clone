@@ -1,0 +1,6 @@
+# Dotnet app
+bin/
+obj/
+
+# Next app
+node_modules/

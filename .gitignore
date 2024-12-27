@@ -1,6 +1,6 @@
 # Dotnet app
 bin/
 obj/
-
+.DS_Store
 # Next app
 node_modules/

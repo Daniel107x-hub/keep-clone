@@ -3,8 +3,11 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using backend.Models;
+using backend.Repository;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Net.Http.Headers;
 using Microsoft.OpenApi.Models;
@@ -40,6 +43,7 @@ builder.Services.AddDbContext<KeepContext>();
 builder.Services.AddScoped<PasswordHasher<User>>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<INoteRepository, NoteRepository>();
+builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -63,13 +67,22 @@ var app = builder.Build();
 app.UseSwagger(); // Adds middleware to expose openapi document
 app.UseSwaggerUI(); // Add middleware that serves swaggerui
 
-app.MapPost("/api/Account/Register", (User user, IUserRepository users, PasswordHasher<User> passwordHasher) => {
-    user.Password = passwordHasher.HashPassword(user, user.Password);
-    users.CreateUser(user);
-    return Results.Created($"/api/Account/{user.Id}", user);
+app.MapPost("/api/Account/Register", (UserRegisterDto user, IUserRepository users, PasswordHasher<User> passwordHasher) => {
+    User newUser  = new User {
+        FirstName = user.FirstName,
+        LastName = user.LastName,
+        Email = user.Email,
+        Password = user.Password,
+        PhoneNumber = user.PhoneNumber,
+        UserName = user.UserName,
+        IsActive = true
+    };
+    newUser.Password = passwordHasher.HashPassword(newUser, newUser.Password);
+    users.CreateUser(newUser);
+    return Results.Created($"/api/Account/{newUser.Id}", user);
 });
 
-app.MapPost("/api/Account/Login", async (User user, IUserRepository users, PasswordHasher<User> passwordHasher) => {
+app.MapPost("/api/Account/Login", async (UserLoginDto user, IUserRepository users, PasswordHasher<User> passwordHasher) => {
     var foundUser = await users.GetUserByUserName(user.UserName);
     if (foundUser == null) {
         return Results.NotFound();
@@ -100,13 +113,35 @@ app.MapPost("/api/Account/Logout", () => {
     return Results.Ok();
 }).RequireAuthorization();
 
-app.MapPost("/api/Note", (Note note, INoteRepository notes) => {
-    notes.Create(note);
-    return Results.Created($"/api/Note/{note.Id}", note);
+app.MapPost("/api/Note", async (NoteDto note, INoteRepository notes, IUserRepository users, IHttpContextAccessor httpContextAccessor) => {
+    var context = httpContextAccessor.HttpContext;
+    var user = context.User;
+    var foundUser = await users.GetUserByUserName(user.Identity.Name);
+    if(foundUser == null || !foundUser.IsActive) {
+        return Results.NotFound();
+    }
+    Note newNote = new Note {
+        Title = note.Title,
+        Content = note.Content,
+        UserId = foundUser.Id,
+        User = foundUser
+    };
+    notes.Create(newNote);
+    return Results.Created($"/api/Note/{newNote.Id}", note);
 }).RequireAuthorization();
 
-app.MapGet("/api/Note", (INoteRepository notes) => {
-    return Results.Ok(notes.GetAll());
+app.MapGet("/api/Note", async ([FromServices]IUserRepository users, [FromServices]IHttpContextAccessor httpContextAccessor) => {
+    var context = httpContextAccessor.HttpContext;
+    var user = context.User;
+    User foundUser = await users.GetUserByUserName(user.Identity.Name);
+    if(foundUser == null || !foundUser.IsActive) {
+        return Results.NotFound();
+    }
+    var notesDto = foundUser.Notes.Select(n => new NoteDto {
+        Title = n.Title,
+        Content = n.Content
+    });
+    return Results.Ok(notesDto);
 }).RequireAuthorization();
 
 app.UseAuthentication();

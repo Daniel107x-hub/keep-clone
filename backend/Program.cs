@@ -4,10 +4,10 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using backend.Models;
-using backend.Repository;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Net.Http.Headers;
 using Microsoft.OpenApi.Models;
@@ -41,8 +41,6 @@ builder.Services.AddSwaggerGen(opts => { // Add swagger configuration for JWT au
 
 builder.Services.AddDbContext<KeepContext>();
 builder.Services.AddScoped<PasswordHasher<User>>();
-builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<INoteRepository, NoteRepository>();
 builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
 builder.Services.AddAuthentication(options =>
 {
@@ -67,7 +65,7 @@ var app = builder.Build();
 app.UseSwagger(); // Adds middleware to expose openapi document
 app.UseSwaggerUI(); // Add middleware that serves swaggerui
 
-app.MapPost("/api/Account/Register", (UserRegisterDto user, IUserRepository users, PasswordHasher<User> passwordHasher) => {
+app.MapPost("/api/Account/Register", (UserRegisterDto user, KeepContext _context, PasswordHasher<User> passwordHasher) => {
     User newUser  = new User {
         FirstName = user.FirstName,
         LastName = user.LastName,
@@ -78,12 +76,14 @@ app.MapPost("/api/Account/Register", (UserRegisterDto user, IUserRepository user
         IsActive = true
     };
     newUser.Password = passwordHasher.HashPassword(newUser, newUser.Password);
-    users.CreateUser(newUser);
+    _context.Users.Add(newUser);
+    _context.SaveChanges();
     return Results.Created($"/api/Account/{newUser.Id}", user);
 });
 
-app.MapPost("/api/Account/Login", async (UserLoginDto user, IUserRepository users, PasswordHasher<User> passwordHasher) => {
-    var foundUser = await users.GetUserByUserName(user.UserName);
+app.MapPost("/api/Account/Login", async (UserLoginDto user, KeepContext _context, PasswordHasher<User> passwordHasher) =>
+{
+    var foundUser = await _context.Users.Where(u => u.UserName == user.UserName).FirstAsync();
     if (foundUser == null) {
         return Results.NotFound();
     }
@@ -113,10 +113,10 @@ app.MapPost("/api/Account/Logout", () => {
     return Results.Ok();
 }).RequireAuthorization();
 
-app.MapPost("/api/Note", async (NoteDto note, INoteRepository notes, IUserRepository users, IHttpContextAccessor httpContextAccessor) => {
+app.MapPost("/api/Note", async (NoteDto note, KeepContext _context, IHttpContextAccessor httpContextAccessor) => {
     var context = httpContextAccessor.HttpContext;
     var user = context.User;
-    var foundUser = await users.GetUserByUserName(user.Identity.Name);
+    var foundUser = await _context.Users.Include(u=> u.Notes).Where(u => u.UserName == user.Identity.Name).FirstAsync();
     if(foundUser == null || !foundUser.IsActive) {
         return Results.NotFound();
     }
@@ -126,14 +126,15 @@ app.MapPost("/api/Note", async (NoteDto note, INoteRepository notes, IUserReposi
         UserId = foundUser.Id,
         User = foundUser
     };
-    notes.Create(newNote);
+    foundUser.Notes.Add(newNote);
+    _context.SaveChanges();
     return Results.Created($"/api/Note/{newNote.Id}", note);
 }).RequireAuthorization();
 
-app.MapGet("/api/Note", async ([FromServices]IUserRepository users, [FromServices]IHttpContextAccessor httpContextAccessor) => {
+app.MapGet("/api/Note", async ([FromServices]KeepContext _context, IHttpContextAccessor httpContextAccessor) => {
     var context = httpContextAccessor.HttpContext;
     var user = context.User;
-    User foundUser = await users.GetUserByUserName(user.Identity.Name);
+    User foundUser = await _context.Users.Include(u => u.Notes).Where(u => u.UserName == user.Identity.Name).FirstAsync();
     if(foundUser == null || !foundUser.IsActive) {
         return Results.NotFound();
     }

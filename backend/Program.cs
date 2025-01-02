@@ -73,12 +73,25 @@ app.MapPost("/api/Account/Register", (UserRegisterDto user, KeepContext _context
         Password = user.Password,
         PhoneNumber = user.PhoneNumber,
         UserName = user.UserName,
-        IsActive = true
+        IsActive = false
     };
     newUser.Password = passwordHasher.HashPassword(newUser, newUser.Password);
     _context.Users.Add(newUser);
     _context.SaveChanges();
-    return Results.Created($"/api/Account/{newUser.Id}", user);
+    return Results.Created($"/api/Account/{user.UserName}", user);
+});
+
+app.MapGet("/api/Account/{userName}", async (string userName, KeepContext _context) =>
+{
+    var user = await _context.Users.Where(u => u.UserName == userName).FirstAsync();
+    if (user == null)
+    {
+        return Results.NotFound();
+    }
+    if(user.IsActive) return Results.Ok(user);
+    user.IsActive = true;
+    _context.SaveChanges();
+    return Results.Ok("The user has been activated successfully!");
 });
 
 app.MapPost("/api/Account/Login", async (UserLoginDto user, KeepContext _context, PasswordHasher<User> passwordHasher) =>
@@ -86,6 +99,11 @@ app.MapPost("/api/Account/Login", async (UserLoginDto user, KeepContext _context
     var foundUser = await _context.Users.Where(u => u.UserName == user.UserName).FirstAsync();
     if (foundUser == null) {
         return Results.NotFound();
+    }
+
+    if (!foundUser.IsActive)
+    {
+        return Results.BadRequest("The user is not active!");
     }
     var result = passwordHasher.VerifyHashedPassword(foundUser, foundUser.Password, user.Password);
     if (result == PasswordVerificationResult.Failed) {
@@ -123,7 +141,6 @@ app.MapPost("/api/Note", async (NoteDto note, KeepContext _context, IHttpContext
     Note newNote = new Note {
         Title = note.Title,
         Content = note.Content,
-        UserId = foundUser.Id,
         User = foundUser
     };
     foundUser.Notes.Add(newNote);

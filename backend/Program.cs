@@ -7,10 +7,13 @@ using backend.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Net.Http.Headers;
 using Microsoft.OpenApi.Models;
+using SendGrid;
+using SendGrid.Helpers.Mail;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer(); // Add endpoint discovery features
@@ -65,7 +68,7 @@ var app = builder.Build();
 app.UseSwagger(); // Adds middleware to expose openapi document
 app.UseSwaggerUI(); // Add middleware that serves swaggerui
 
-app.MapPost("/api/Account/Register", (UserRegisterDto user, KeepContext _context, PasswordHasher<User> passwordHasher) => {
+app.MapPost("/api/Account", async (UserRegisterDto user, KeepContext _context, PasswordHasher<User> passwordHasher) => {
     User newUser  = new User {
         FirstName = user.FirstName,
         LastName = user.LastName,
@@ -78,13 +81,56 @@ app.MapPost("/api/Account/Register", (UserRegisterDto user, KeepContext _context
     newUser.Password = passwordHasher.HashPassword(newUser, newUser.Password);
     _context.Users.Add(newUser);
     _context.SaveChanges();
+    // Send confirmation email
+    var apiKey = Environment.GetEnvironmentVariable("SENDGRID_API_KEY");
+    var client = new SendGridClient(apiKey);
+    var templateId = app.Configuration["SendGrid:TemplateId"];
+    var encodedUserName = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(newUser.UserName));
+    var msg = MailHelper.CreateSingleTemplateEmail(
+        from: new EmailAddress("daniel107x@outlook.es", "Example User"),
+        to: new EmailAddress(newUser.Email, newUser.FirstName),
+        templateId: templateId,
+        dynamicTemplateData: new
+        {
+            userName = user.UserName,
+            url = "https://daniel107x-keep.duckdns.org/api/Account/Activate" + encodedUserName
+        }
+    );
+    await client.SendEmailAsync(msg);
     return Results.Created($"/api/Account/{user.UserName}", user);
 });
 
-app.MapGet("/api/Account/{userName}", async (string userName, KeepContext _context) =>
+app.MapGet("/api/Account", (KeepContext _context) =>
 {
-    var user = await _context.Users.Where(u => u.UserName == userName).FirstAsync();
-    if (user == null)
+    IEnumerable<User> users = _context.Users;
+    return Results.Ok(users);
+});
+
+app.MapDelete("/api/Account/{userName}", async (string userName, KeepContext _context) =>
+{
+    User user;
+    try
+    {
+        user = await _context.Users.Where(u => u.UserName == userName).FirstAsync();
+    }
+    catch (InvalidOperationException e)
+    {
+        return Results.NotFound();
+    }
+    _context.Users.Remove(user);
+    _context.SaveChanges();
+    return Results.NoContent();
+});
+
+app.MapGet("/api/Account/Activate/{encodedUserName}", async (string encodedUserName, KeepContext _context) =>
+{
+    var userName = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(encodedUserName));
+    User user;
+    try
+    {
+        user = await _context.Users.Where(u => u.UserName == userName).FirstAsync();
+    }
+    catch (InvalidOperationException ex)
     {
         return Results.NotFound();
     }

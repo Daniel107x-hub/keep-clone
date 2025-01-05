@@ -142,7 +142,6 @@ app.MapPost("/api/Account/Login", async (UserLoginDto user, KeepContext _context
     if (foundUser == null) {
         return Results.NotFound();
     }
-
     if (!foundUser.IsActive)
     {
         return Results.BadRequest("The user is not active!");
@@ -151,24 +150,8 @@ app.MapPost("/api/Account/Login", async (UserLoginDto user, KeepContext _context
     if (result == PasswordVerificationResult.Failed) {
         return Results.NotFound();
     }
-    var role = foundUser.IsAdmin ? "ADMIN" : "USER";
-    var claims = new[] {
-        new Claim(ClaimTypes.Name, foundUser.UserName),
-        new Claim(ClaimTypes.Role, role),
-        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-    };
-    var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(app.Configuration["Jwt:Key"]));
-    var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-    var token = new JwtSecurityToken(
-        issuer: app.Configuration["Jwt:Issuer"],
-        audience: app.Configuration["Jwt:Audience"],
-        claims: claims,
-        expires: DateTime.Now.AddMinutes(30),
-        signingCredentials: creds
-    );
-    return Results.Ok(new {
-        token = new JwtSecurityTokenHandler().WriteToken(token)
-    });
+    var token = GenerateToken(foundUser);
+    return Results.Ok(new { token });
 });
 
 app.MapPost("/api/Account/Logout", () => {
@@ -228,4 +211,24 @@ async Task SendConfirmationEmail(User user)
         }
     );
     await client.SendEmailAsync(msg);
+}
+
+string GenerateToken(User user)
+{
+    var role = user.IsAdmin ? "ADMIN" : "USER";
+    var claims = new[] {
+        new Claim(ClaimTypes.Name, user.UserName),
+        new Claim(ClaimTypes.Role, role),
+        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+    };
+    var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(app.Configuration["Jwt:Key"]));
+    var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+    var token = new JwtSecurityToken(
+        issuer: app.Configuration["Jwt:Issuer"],
+        audience: app.Configuration["Jwt:Audience"],
+        claims: claims,
+        expires: DateTime.Now.AddMinutes(30),
+        signingCredentials: creds
+    );
+    return new JwtSecurityTokenHandler().WriteToken(token);
 }

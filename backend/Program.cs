@@ -62,7 +62,10 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
     };
 });
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("isAdminPolicy", policy => policy.RequireClaim(ClaimTypes.Role, "ADMIN"));
+});
 
 var app = builder.Build();
 app.UseSwagger(); // Adds middleware to expose openapi document
@@ -76,27 +79,19 @@ app.MapPost("/api/Account", async (UserRegisterDto user, KeepContext _context, P
         Password = user.Password,
         PhoneNumber = user.PhoneNumber,
         UserName = user.UserName,
-        IsActive = false
+        IsActive = true
     };
     newUser.Password = passwordHasher.HashPassword(newUser, newUser.Password);
-    _context.Users.Add(newUser);
-    _context.SaveChanges();
-    // Send confirmation email
-    var apiKey = Environment.GetEnvironmentVariable("SENDGRID_API_KEY");
-    var client = new SendGridClient(apiKey);
-    var templateId = app.Configuration["SendGrid:TemplateId"];
-    var encodedUserName = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(newUser.UserName));
-    var msg = MailHelper.CreateSingleTemplateEmail(
-        from: new EmailAddress("daniel107x@outlook.es", "Example User"),
-        to: new EmailAddress(newUser.Email, newUser.FirstName),
-        templateId: templateId,
-        dynamicTemplateData: new
-        {
-            userName = user.UserName,
-            url = "https://daniel107x-keep.duckdns.org/api/Account/Activate" + encodedUserName
-        }
-    );
-    await client.SendEmailAsync(msg);
+    try
+    {
+        _context.Users.Add(newUser);
+        _context.SaveChanges();
+    }
+    catch (DbUpdateException e)
+    {
+        return Results.BadRequest("An error occurred while adding user");
+    }
+    //await SendConfirmationEmail(newUser);
     return Results.Created($"/api/Account/{user.UserName}", user);
 });
 
@@ -104,7 +99,7 @@ app.MapGet("/api/Account", (KeepContext _context) =>
 {
     IEnumerable<User> users = _context.Users;
     return Results.Ok(users);
-});
+}).RequireAuthorization("isAdminPolicy");
 
 app.MapDelete("/api/Account/{userName}", async (string userName, KeepContext _context) =>
 {
@@ -117,10 +112,11 @@ app.MapDelete("/api/Account/{userName}", async (string userName, KeepContext _co
     {
         return Results.NotFound();
     }
+
     _context.Users.Remove(user);
     _context.SaveChanges();
     return Results.NoContent();
-});
+}).RequireAuthorization("isAdminPolicy");
 
 app.MapGet("/api/Account/Activate/{encodedUserName}", async (string encodedUserName, KeepContext _context) =>
 {
@@ -155,8 +151,10 @@ app.MapPost("/api/Account/Login", async (UserLoginDto user, KeepContext _context
     if (result == PasswordVerificationResult.Failed) {
         return Results.NotFound();
     }
+    var role = foundUser.IsAdmin ? "ADMIN" : "USER";
     var claims = new[] {
         new Claim(ClaimTypes.Name, foundUser.UserName),
+        new Claim(ClaimTypes.Role, role),
         new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
     };
     var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(app.Configuration["Jwt:Key"]));
@@ -211,3 +209,23 @@ app.MapGet("/api/Note", async ([FromServices]KeepContext _context, IHttpContextA
 app.UseAuthentication();
 app.UseAuthorization();
 app.Run();
+
+async Task SendConfirmationEmail(User user)
+{
+    // Send confirmation email
+    var apiKey = Environment.GetEnvironmentVariable("SENDGRID_API_KEY");
+    var client = new SendGridClient(apiKey);
+    var templateId = app.Configuration["SendGrid:TemplateId"];
+    var encodedUserName = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(user.UserName));
+    var msg = MailHelper.CreateSingleTemplateEmail(
+        from: new EmailAddress("daniel107x@outlook.es", "Example User"),
+        to: new EmailAddress(user.Email, user.FirstName),
+        templateId: templateId,
+        dynamicTemplateData: new
+        {
+            userName = user.UserName,
+            url = "https://daniel107x-keep.duckdns.org/api/Account/Activate" + encodedUserName
+        }
+    );
+    await client.SendEmailAsync(msg);
+}

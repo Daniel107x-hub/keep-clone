@@ -23,6 +23,8 @@ namespace backend.Models
         public required string PhoneNumber { get; set; }
         [MaxLength(50)]
         public required string UserName { get; set; }
+
+        public bool IsAdmin { get; set; }
         public bool IsActive { get; set; }
         public ICollection<Note> Notes { get; }
     }

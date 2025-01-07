@@ -67,9 +67,20 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("isAdminPolicy", policy => policy.RequireClaim(ClaimTypes.Role, "ADMIN"));
 });
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+});
+
 var app = builder.Build();
-app.UseSwagger(); // Adds middleware to expose openapi document
-app.UseSwaggerUI(); // Add middleware that serves swaggerui
+
+if(app.Environment.IsDevelopment())
+{
+    app.UseDeveloperExceptionPage();
+    app.UseCors("AllowAll");
+    app.UseSwagger(); // Adds middleware to expose openapi document
+    app.UseSwaggerUI(); // Add middleware that serves swaggerui
+}
 
 app.MapPost("/api/Account", async (UserRegisterDto user, KeepContext _context, PasswordHasher<User> passwordHasher) => {
     User newUser  = new User {
@@ -81,6 +92,10 @@ app.MapPost("/api/Account", async (UserRegisterDto user, KeepContext _context, P
         UserName = user.UserName,
         IsActive = true
     };
+    var userExists = await _context.Users.Where(u => u.UserName == newUser.UserName).FirstOrDefaultAsync();
+    if(userExists != null) {
+        return Results.BadRequest("Username already exists");
+    }
     newUser.Password = passwordHasher.HashPassword(newUser, newUser.Password);
     try
     {
@@ -89,7 +104,7 @@ app.MapPost("/api/Account", async (UserRegisterDto user, KeepContext _context, P
     }
     catch (DbUpdateException e)
     {
-        return Results.BadRequest("An error occurred while adding user");
+        return Results.BadRequest("An error occurred while creating the account");
     }
     //await SendConfirmationEmail(newUser);
     return Results.Created($"/api/Account/{user.UserName}", user);

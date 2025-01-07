@@ -9,6 +9,14 @@ export const SignupFormSchema = z.object({
         .string()
         .min(2,  {message: 'Last name is required'})
         .trim(),
+    userName: z
+        .string()
+        .min(4, {message: 'Username is required'})
+        .trim(),
+    phone: z
+        .string()
+        .min(10, {message: 'Phone number is required'})
+        .trim(),
     email: z
         .string()
         .email({message: 'Email is required'})
@@ -26,8 +34,11 @@ export type FormState = | {
     errors? : {
         firstName?: string[]
         lastName?: string[]
+        userName?: string[]
+        phone?: string[]
         email?: string[]
         password?: string[]
+        request?: string
     }
     message?: string
 } | undefined

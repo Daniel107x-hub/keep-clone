@@ -3,6 +3,8 @@ import { signup } from '@/app/actions/auth';
 import { useActionState, useEffect} from "react";
 import {toast, ToastContainer} from "react-toastify";
 import Input from "@/app/components/Input";
+import useAuth from "@/app/hooks/useAuth";
+import {redirect} from "next/navigation";
 
 
 // Auth steps:
@@ -51,6 +53,7 @@ const INPUTS = [
 
 const SignupForm = () => {
     const [state, action, pending] = useActionState(signup, undefined);
+    const [isAuthenticated, isLoading] = useAuth();
     useEffect(() => {
         if(state?.message) {
             toast.success(state.message);
@@ -59,6 +62,8 @@ const SignupForm = () => {
             toast.error(state.errors.request);
         }
     }, [state])
+    if(isLoading) return <>Loading...</>
+    if(isAuthenticated) redirect('/');
     return (
         <div className="w-full h-screen flex items-center justify-center">
             <form action={action} className='flex flex-col gap-4 items-center py-4 bg-slate-800 p-8 rounded-lg w-1/2 md:w-1/4 xl:w-1/5'>

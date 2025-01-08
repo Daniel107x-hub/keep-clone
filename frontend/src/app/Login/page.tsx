@@ -4,6 +4,7 @@ import {login} from "@/app/actions/auth";
 import {toast, ToastContainer} from "react-toastify";
 import Input from "@/app/components/Input";
 import {redirect} from "next/navigation";
+import useAuth from "@/app/hooks/useAuth";
 
 const INPUTS = [
     {
@@ -22,6 +23,7 @@ const INPUTS = [
 
 const LoginForm = () => {
     const [state, action, pending] = useActionState(login, undefined);
+    const [isAuthenticated, isLoading] = useAuth();
     useEffect(() => {
         if(state?.message) {
             toast.success(state.message);
@@ -31,6 +33,8 @@ const LoginForm = () => {
             toast.error(state.errors.request);
         }
     }, [state])
+    if(isLoading) return <>Loading...</>
+    if(isAuthenticated) redirect('/');
     return (
         <div className="w-full h-screen flex items-center justify-center">
             <form action={action} className='flex flex-col gap-4 items-center py-4 bg-slate-800 p-8 rounded-lg w-1/2 md:w-1/4 xl:w-1/5'>

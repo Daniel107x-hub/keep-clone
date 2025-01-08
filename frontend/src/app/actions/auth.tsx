@@ -1,7 +1,7 @@
 import {SignupFormState, SignupFormSchema, LoginFormState, LoginFormSchema} from "@/app/lib/definitions";
 import axios from "axios";
 
-axios.defaults.baseURL = 'http://localhost:5085/api';
+axios.defaults.baseURL = 'http://localhost:50000/api';
 
 export async function signup(state: SignupFormState, formData: FormData): Promise<SignupFormState>{
     const validateFields = SignupFormSchema.safeParse({
@@ -27,7 +27,8 @@ export async function signup(state: SignupFormState, formData: FormData): Promis
     try{
         await axios.post('/Account', payload);
         return {message: 'Account created successfully'}
-    }catch (e: any) {
+    // @ts-expect-error Exception
+    }catch (e: never) {
         return {errors: {request: e?.response.data}}
     }
 }
@@ -46,10 +47,11 @@ export async function login(state: LoginFormState, formData: FormData): Promise<
         password: password
     }
     try{
-        const response = await axios.post('/Account/Login', payload, {withCredentials: true});
-        console.log(response);
+        const response = await axios.post('/Account/Login', payload);
+        sessionStorage.setItem('token', response.data);
         return {message: 'Login successful'}
-    }catch (e: any) {
+    // @ts-expect-error Exception
+    }catch (e: never) {
         return {errors: {request: e?.response.data}}
     }
 }

@@ -14,7 +14,6 @@ using Microsoft.Net.Http.Headers;
 using Microsoft.OpenApi.Models;
 using SendGrid;
 using SendGrid.Helpers.Mail;
-using SameSiteMode = Microsoft.AspNetCore.Http.SameSiteMode;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer(); // Add endpoint discovery features
@@ -71,14 +70,13 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll",
-        builder => builder.WithOrigins("http://localhost:3000").AllowAnyMethod().AllowAnyHeader().AllowCredentials());
+        builder => builder.WithOrigins("http://localhost:50000").AllowAnyMethod().AllowAnyHeader().AllowCredentials());
 });
 
 var app = builder.Build();
 
 if(app.Environment.IsDevelopment())
 {
-    app.UseDeveloperExceptionPage();
     app.UseCors("AllowAll");
     app.UseSwagger(); // Adds middleware to expose openapi document
     app.UseSwaggerUI(); // Add middleware that serves swaggerui
@@ -168,19 +166,18 @@ app.MapPost("/api/Account/Login", async (UserLoginDto user, KeepContext _context
         return Results.NotFound();
     }
     var token = GenerateToken(foundUser);
-    var response = new HttpResponseMessage();
-    var cookieOptions = new CookieOptions
-    {
-        // HttpOnly = true,
-        Expires = DateTime.Now.AddMinutes(30),
-        MaxAge = TimeSpan.FromMinutes(30),
-        SameSite = SameSiteMode.None,
-        Secure = true
-    };
-    var cookie = cookieOptions.CreateCookieHeader("token", token);
-    // response.Headers.Add(HeaderNames.SetCookie, cookie.ToString());
-    httpContext.Response.Headers.Append(HeaderNames.SetCookie, cookie.ToString());
-    return Results.Ok();
+    // var cookieOptions = new CookieOptions
+    // {
+    //     // HttpOnly = true,
+    //     Expires = DateTime.Now.AddMinutes(30),
+    //     MaxAge = TimeSpan.FromMinutes(30),
+    //     SameSite = SameSiteMode.None,
+    //     Secure = true
+    // };
+    // var cookie = cookieOptions.CreateCookieHeader("token", token);
+    // // response.Headers.Add(HeaderNames.SetCookie, cookie.ToString());
+    // httpContext.Response.Headers.Append(HeaderNames.SetCookie, cookie.ToString());
+    return Results.Ok(token);
 });
 
 app.MapPost("/api/Account/Logout", () => {

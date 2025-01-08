@@ -30,7 +30,7 @@ export const SignupFormSchema = z.object({
         .trim()
 })
 
-export type FormState = | {
+export type SignupFormState = | {
     errors? : {
         firstName?: string[]
         lastName?: string[]
@@ -42,3 +42,23 @@ export type FormState = | {
     }
     message?: string
 } | undefined
+
+export const LoginFormSchema = z.object({
+    userName: z
+        .string()
+        .min(4, {message: 'Username is required'})
+        .trim(),
+    password: z
+        .string()
+        .min(8, {message: 'Password should have a min length of 8'})
+        .trim()
+})
+
+export type LoginFormState = | {
+    errors? : {
+        userName?: string[]
+        password?: string[]
+        request?: string
+    }
+    message?: string
+} | undefined;

@@ -14,6 +14,7 @@ using Microsoft.Net.Http.Headers;
 using Microsoft.OpenApi.Models;
 using SendGrid;
 using SendGrid.Helpers.Mail;
+using SameSiteMode = Microsoft.AspNetCore.Http.SameSiteMode;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer(); // Add endpoint discovery features
@@ -69,7 +70,8 @@ builder.Services.AddAuthorization(options =>
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+    options.AddPolicy("AllowAll",
+        builder => builder.WithOrigins("http://localhost:3000").AllowAnyMethod().AllowAnyHeader().AllowCredentials());
 });
 
 var app = builder.Build();
@@ -151,7 +153,7 @@ app.MapGet("/api/Account/Activate/{encodedUserName}", async (string encodedUserN
     return Results.Ok("The user has been activated successfully!");
 });
 
-app.MapPost("/api/Account/Login", async (UserLoginDto user, KeepContext _context, PasswordHasher<User> passwordHasher) =>
+app.MapPost("/api/Account/Login", async (UserLoginDto user, KeepContext _context, PasswordHasher<User> passwordHasher, HttpContext httpContext) =>
 {
     var foundUser = await _context.Users.Where(u => u.UserName == user.UserName).FirstAsync();
     if (foundUser == null) {
@@ -166,7 +168,19 @@ app.MapPost("/api/Account/Login", async (UserLoginDto user, KeepContext _context
         return Results.NotFound();
     }
     var token = GenerateToken(foundUser);
-    return Results.Ok(new { token });
+    var response = new HttpResponseMessage();
+    var cookieOptions = new CookieOptions
+    {
+        // HttpOnly = true,
+        Expires = DateTime.Now.AddMinutes(30),
+        MaxAge = TimeSpan.FromMinutes(30),
+        SameSite = SameSiteMode.None,
+        Secure = true
+    };
+    var cookie = cookieOptions.CreateCookieHeader("token", token);
+    // response.Headers.Add(HeaderNames.SetCookie, cookie.ToString());
+    httpContext.Response.Headers.Append(HeaderNames.SetCookie, cookie.ToString());
+    return Results.Ok();
 });
 
 app.MapPost("/api/Account/Logout", () => {

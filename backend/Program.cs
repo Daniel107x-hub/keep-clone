@@ -116,6 +116,8 @@ app.MapGet("/api/Account", (KeepContext _context) =>
     return Results.Ok(users);
 }).RequireAuthorization("isAdminPolicy");
 
+app.MapGet("/api/Account/CurrentUser", () => Results.Ok()).RequireAuthorization();
+
 app.MapDelete("/api/Account/{userName}", async (string userName, KeepContext _context) =>
 {
     User user;

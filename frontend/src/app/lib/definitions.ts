@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import {NoteType} from "@/app/types/NoteType";
 
 export const SignupFormSchema = z.object({
     firstName: z
@@ -68,4 +69,5 @@ export type NewNoteFormSate = | {
         request?: string
     }
     message?: string
+    data?: NoteType
 } | undefined;

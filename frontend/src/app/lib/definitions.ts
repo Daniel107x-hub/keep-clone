@@ -62,3 +62,10 @@ export type LoginFormState = | {
     }
     message?: string
 } | undefined;
+
+export type NewNoteFormSate = | {
+    errors? : {
+        request?: string
+    }
+    message?: string
+} | undefined;

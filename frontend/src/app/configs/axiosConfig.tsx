@@ -12,4 +12,23 @@ api.interceptors.request.use((config) => {
     return config;
 });
 
+api.interceptors.response.use((response) => {
+    return response;
+}, (error) => {
+    const status = error.status;
+    if (status >= 400 && status <= 499) {
+        return Promise.reject({
+            ...error,
+            message: 'An error occurred'
+        });
+    }
+    if (status >= 500 && status <= 599) {
+        return Promise.reject({
+            ...error,
+            message: 'Server error, please try again later'
+        });
+    }
+    return Promise.reject(error);
+});
+
 export default api;

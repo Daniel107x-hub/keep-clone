@@ -155,8 +155,13 @@ app.MapGet("/api/Account/Activate/{encodedUserName}", async (string encodedUserN
 
 app.MapPost("/api/Account/Login", async (UserLoginDto user, KeepContext _context, PasswordHasher<User> passwordHasher, HttpContext httpContext) =>
 {
-    var foundUser = await _context.Users.Where(u => u.UserName == user.UserName).FirstAsync();
-    if (foundUser == null) {
+    User foundUser;
+    try
+    {
+        foundUser = await _context.Users.Where(u => u.UserName == user.UserName).FirstAsync();
+    }
+    catch (InvalidOperationException ex)
+    {
         return Results.NotFound();
     }
     if (!foundUser.IsActive)
@@ -186,7 +191,7 @@ app.MapPost("/api/Account/Logout", () => {
     return Results.Ok();
 }).RequireAuthorization();
 
-app.MapPost("/api/Note", async (NoteDto note, KeepContext _context, IHttpContextAccessor httpContextAccessor) => {
+app.MapPost("/api/Notes", async (NoteDto note, KeepContext _context, IHttpContextAccessor httpContextAccessor) => {
     var context = httpContextAccessor.HttpContext;
     var user = context.User;
     var foundUser = await _context.Users.Include(u=> u.Notes).Where(u => u.UserName == user.Identity.Name).FirstAsync();
@@ -200,10 +205,11 @@ app.MapPost("/api/Note", async (NoteDto note, KeepContext _context, IHttpContext
     };
     foundUser.Notes.Add(newNote);
     _context.SaveChanges();
+    note.Id = newNote.Id;
     return Results.Created($"/api/Note/{newNote.Id}", note);
 }).RequireAuthorization();
 
-app.MapGet("/api/Note", async ([FromServices]KeepContext _context, IHttpContextAccessor httpContextAccessor) => {
+app.MapGet("/api/Notes", async ([FromServices]KeepContext _context, IHttpContextAccessor httpContextAccessor) => {
     var context = httpContextAccessor.HttpContext;
     var user = context.User;
     User foundUser = await _context.Users.Include(u => u.Notes).Where(u => u.UserName == user.Identity.Name).FirstAsync();
@@ -211,11 +217,31 @@ app.MapGet("/api/Note", async ([FromServices]KeepContext _context, IHttpContextA
         return Results.NotFound();
     }
     var notesDto = foundUser.Notes.Select(n => new NoteDto {
+        Id = n.Id,
         Title = n.Title,
         Content = n.Content
     });
     return Results.Ok(notesDto);
 }).RequireAuthorization();
+
+app.MapDelete("/api/Notes/{noteId}",
+    async (long noteId, KeepContext _context, IHttpContextAccessor httpContextAccessor) =>
+    {   
+        var context = httpContextAccessor.HttpContext;
+        var user = context.User;
+        User foundUser = await _context.Users.Include(u => u.Notes).Where(u => u.UserName == user.Identity.Name).FirstAsync();
+        if(foundUser == null || !foundUser.IsActive) {
+            return Results.NotFound();
+        }
+        Note note = foundUser.Notes.Where(n => n.Id == noteId).FirstOrDefault();
+        if(note == null) {
+            return Results.NotFound();
+        }
+        foundUser.Notes.Remove(note);
+        _context.SaveChanges();
+        return Results.NoContent();
+    }
+).RequireAuthorization();
 
 app.UseAuthentication();
 app.UseAuthorization();

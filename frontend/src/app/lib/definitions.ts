@@ -14,7 +14,7 @@ export const SignupFormSchema = z.object({
         .string()
         .min(4, {message: 'Username is required'})
         .trim(),
-    phone: z
+    phoneNumber: z
         .string()
         .min(10, {message: 'Phone number is required'})
         .trim(),
@@ -36,12 +36,13 @@ export type SignupFormState = | {
         firstName?: string[]
         lastName?: string[]
         userName?: string[]
-        phone?: string[]
+        phoneNumber?: string[]
         email?: string[]
         password?: string[]
         request?: string
     }
-    message?: string
+    message?: string,
+    payload?: object
 } | undefined
 
 export const LoginFormSchema = z.object({
@@ -61,7 +62,8 @@ export type LoginFormState = | {
         password?: string[]
         request?: string
     }
-    message?: string
+    message?: string,
+    payload?: object
 } | undefined;
 
 export type NewNoteFormSate = | {

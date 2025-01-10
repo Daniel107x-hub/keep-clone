@@ -20,7 +20,7 @@ type NoteFormProps = {
     onSubmit: (note: NoteType) => void;
 }
 
-function NewNote(props: NoteFormProps): React.ReactNode{
+function AddNoteForm(props: NoteFormProps): React.ReactNode{
     const [state, action, pending] = useActionState(addNote, undefined);
     const [title, setTitle] = useState<string>("");
     const [content, setContent] = useState<string>("");
@@ -29,7 +29,6 @@ function NewNote(props: NoteFormProps): React.ReactNode{
     useEffect(() => {
         if(pending) return;
         if(state?.message && state.data) {
-            toast.success(state.message);
             onSubmit(state.data);
         }
         if(state?.errors?.request) {
@@ -40,8 +39,8 @@ function NewNote(props: NoteFormProps): React.ReactNode{
     }, [state, pending, onSubmit]);
 
     const handleSubmit = (e: FormEvent) => {
-        if(title.trim() === "" || content.trim() === ""){
-            e.stopPropagation();
+        if(title.trim() === "" && content.trim() === ""){
+            e.preventDefault();
             return;
         }
     }
@@ -88,7 +87,7 @@ function Note(props: NoteProps): React.ReactNode{
 
     return <div className="group border border-solid border-neutral-600 rounded-xl flex flex-col gap-1 p-4 relative">
         <button className="bg-neutral-700 hover:bg-neutral-600 w-6 h-6 absolute -right-2 -top-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-300" onClick={()=> handleDeleteNote(id)}>x</button>
-        { title && <h1 className="text-xl">{title}</h1> }
+        { title && <h1 className="text-xl font-bold">{title}</h1> }
         { content && <p className="text-sm">{content}</p> }
     </div>
 }
@@ -104,27 +103,26 @@ export default function Home() {
         setIsAddingNote(false);
     }, []);
     const handleDeleteNote = (id: number | undefined) => {
-        if(id === undefined){
-            toast.error("Unable to delete note");
+        if(id === undefined) {
+            toast.error("Unexpected error");
             return;
         }
         setNotes(notes => notes.filter((note: NoteType) => note.id !== id));
-        toast.success("Successfully deleted note");
     }
 
     useEffect(() => {
-    if(!isAuthenticated || isLoading) return;
-    getNotes()
-    .then(res => {
-        const notes : NoteType[] = res.data;
-        setNotes(notes);
-    })
-    .catch(e => {
-        if(e?.response.status === 401) redirect("/Login");
-    })
-    .finally(() => {
-        setLoadingNotes(false);
-    });
+        if(!isAuthenticated || isLoading) return;
+        getNotes()
+            .then(res => {
+                const notes : NoteType[] = res.data;
+                setNotes(notes);
+            })
+            .catch(e => {
+                if(e?.response.status === 401) redirect("/Login");
+            })
+            .finally(() => {
+                setLoadingNotes(false);
+            });
     }, [isAuthenticated, isLoading]);
 
     if(isLoading) return <div>Loading...</div>
@@ -136,7 +134,7 @@ export default function Home() {
     {
         notes.map((note: NoteType) => <Note key={note.id} {...note} onDelete={handleDeleteNote}/>)
     }
-    { isAddingNote && <NewNote onSubmit={handleNewNote}/> }
+    { isAddingNote && <AddNoteForm onSubmit={handleNewNote}/> }
     <button className="bg-neutral-700 w-12 h-12 text-xl rounded-full fixed bottom-4 right-4 hover:bg-neutral-600 hover:text-amber-400" onClick={() => setIsAddingNote(prev => !prev)}>+</button>
         <ToastContainer/>
     </div>

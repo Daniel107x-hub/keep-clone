@@ -33,7 +33,7 @@ const INPUTS = [
     },
     {
         label: "Phone",
-        id: "phone",
+        id: "phoneNumber",
         placeholder: "Phone",
         type: "text"
     },
@@ -55,13 +55,14 @@ const SignupForm = () => {
     const [state, action, pending] = useActionState(signup, undefined);
     const [isAuthenticated, isLoading] = useAuth();
     useEffect(() => {
+        if(pending) return;
         if(state?.message) {
             toast.success(state.message);
         }
         if(state?.errors?.request) {
             toast.error(state.errors.request);
         }
-    }, [state])
+    }, [state, pending])
     if(isLoading) return <>Loading...</>
     if(isAuthenticated) redirect('/');
     return (
@@ -70,9 +71,11 @@ const SignupForm = () => {
                 <h1 className="text-xl font-bold">Register</h1>
                 {INPUTS.map((input) => {
                     const errors: string | string[] | undefined = state?.errors ? state?.errors[input.id as keyof typeof state.errors] : undefined;
+                    const payload : FormData = state?.payload as FormData;
+                    const value: string | number | undefined = payload?.get(input.id) as (string | number) || undefined;
                     return (
                         <div className='flex flex-col items-start w-full' key={input.id}>
-                            <Input {...input}/>
+                            <Input {...input} defaultValue={value}/>
                             {
                                 errors && Array.isArray(errors) &&
                                 <ul className="text-xs text-red-400 list-disc">

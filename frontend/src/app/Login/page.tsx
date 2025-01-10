@@ -25,6 +25,7 @@ const LoginForm = () => {
     const [state, action, pending] = useActionState(login, undefined);
     const [isAuthenticated, isLoading] = useAuth();
     useEffect(() => {
+        if(pending) return;
         if(state?.message) {
             toast.success(state.message);
             redirect('/');
@@ -32,7 +33,7 @@ const LoginForm = () => {
         if(state?.errors?.request) {
             toast.error(state.errors.request);
         }
-    }, [state])
+    }, [state, pending])
     if(isLoading) return <>Loading...</>
     if(isAuthenticated) redirect('/');
     return (

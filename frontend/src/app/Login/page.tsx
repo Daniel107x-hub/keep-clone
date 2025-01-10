@@ -2,9 +2,11 @@
 import {useActionState, useEffect} from "react";
 import {login} from "@/app/actions/auth";
 import {toast, ToastContainer} from "react-toastify";
-import Input from "@/app/components/Input";
+import Input from "@/app/components/Input/Input";
 import {redirect} from "next/navigation";
 import useAuth from "@/app/hooks/useAuth";
+import Link from "next/link";
+import Loader from "@/app/components/Loader/Loader";
 
 const INPUTS = [
     {
@@ -34,10 +36,10 @@ const LoginForm = () => {
             toast.error(state.errors.request);
         }
     }, [state, pending])
-    if(isLoading) return <>Loading...</>
+    if(isLoading) return <Loader fullscreen/>
     if(isAuthenticated) redirect('/');
     return (
-        <div className="w-full h-screen flex items-center justify-center">
+        <div className="w-full h-screen flex flex-col gap-4 items-center justify-center">
             <form action={action} className='flex flex-col gap-4 items-center py-4 bg-slate-800 p-8 rounded-lg w-1/2 md:w-1/4 xl:w-1/5'>
                 <h1 className="text-xl font-bold">Login</h1>
                 {INPUTS.map((input) => {
@@ -59,6 +61,7 @@ const LoginForm = () => {
                 <button disabled={pending} type="submit" className="bg-amber-300 p-3 rounded hover:bg-amber-500 text-amber-800">Login
                 </button>
             </form>
+            <h4 className="text-xs">New? Click <Link href="/Signup" className="text-amber-300 hover:text-amber-500">here</Link> to create an account!</h4>
             <ToastContainer/>
         </div>
     )

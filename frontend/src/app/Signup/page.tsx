@@ -2,9 +2,11 @@
 import { signup } from '@/app/actions/auth';
 import { useActionState, useEffect} from "react";
 import {toast, ToastContainer} from "react-toastify";
-import Input from "@/app/components/Input";
+import Input from "@/app/components/Input/Input";
 import useAuth from "@/app/hooks/useAuth";
 import {redirect} from "next/navigation";
+import Link from "next/link";
+import Loader from "@/app/components/Loader/Loader";
 
 
 // Auth steps:
@@ -63,15 +65,16 @@ const SignupForm = () => {
             toast.error(state.errors.request);
         }
     }, [state, pending])
-    if(isLoading) return <>Loading...</>
+    if(isLoading) return <Loader fullscreen/>
     if(isAuthenticated) redirect('/');
     return (
-        <div className="w-full h-screen flex items-center justify-center">
-            <form action={action} className='flex flex-col gap-4 items-center py-4 bg-slate-800 p-8 rounded-lg w-1/2 md:w-1/4 xl:w-1/5'>
+        <div className="w-full h-screen flex flex-col gap-4 items-center justify-center">
+            <form action={action}
+                  className='flex flex-col gap-4 items-center py-4 bg-slate-800 p-8 rounded-lg w-1/2 md:w-1/4 xl:w-1/5'>
                 <h1 className="text-xl font-bold">Register</h1>
                 {INPUTS.map((input) => {
                     const errors: string | string[] | undefined = state?.errors ? state?.errors[input.id as keyof typeof state.errors] : undefined;
-                    const payload : FormData = state?.payload as FormData;
+                    const payload: FormData = state?.payload as FormData;
                     const value: string | number | undefined = payload?.get(input.id) as (string | number) || undefined;
                     return (
                         <div className='flex flex-col items-start w-full' key={input.id}>
@@ -87,10 +90,14 @@ const SignupForm = () => {
                         </div>
                     )
                 })}
-                <button disabled={pending} type="submit" className="bg-amber-300 p-3 rounded hover:bg-amber-500 text-amber-800">Sign
+                <button disabled={pending} type="submit"
+                        className="bg-amber-300 p-3 rounded hover:bg-amber-500 text-amber-800">Sign
                     up
                 </button>
             </form>
+            <h4 className="text-xs">Already have an account? Click <Link href="/Login"
+                                                     className="text-amber-300 hover:text-amber-500">here</Link> to
+                login!</h4>
             <ToastContainer/>
         </div>
     )

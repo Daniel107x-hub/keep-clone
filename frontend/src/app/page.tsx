@@ -8,6 +8,8 @@ import {NoteType} from "@/app/types/NoteType";
 import TextareaAutosize from 'react-textarea-autosize';
 import {addNote} from "@/app/actions/notes";
 import {toast, ToastContainer} from "react-toastify";
+import Loader from "@/app/components/Loader/Loader";
+import LogoutIcon from "@/app/assets/icons/Logout.svg";
 
 type NoteProps = {
     id: number;
@@ -95,7 +97,7 @@ function Note(props: NoteProps): React.ReactNode{
 export default function Home() {
     const [isAuthenticated, isLoading] = useAuth();
     const [notes, setNotes] = useState<NoteType[]>([]);
-    const [loadingNotes, setLoadingNotes] = useState<boolean>(true);
+    const [loadingNotes, setLoadingNotes] = useState<boolean>(false);
     const [isAddingNote, setIsAddingNote] = useState<boolean>(false);
 
     const handleNewNote = useCallback((note: NoteType) => {
@@ -109,9 +111,14 @@ export default function Home() {
         }
         setNotes(notes => notes.filter((note: NoteType) => note.id !== id));
     }
+    const handleLogout = () => {
+        sessionStorage.removeItem("token");
+        redirect("/Login");
+    }
 
     useEffect(() => {
         if(!isAuthenticated || isLoading) return;
+        setLoadingNotes(true);
         getNotes()
             .then(res => {
                 const notes : NoteType[] = res.data;
@@ -125,17 +132,19 @@ export default function Home() {
             });
     }, [isAuthenticated, isLoading]);
 
-    if(isLoading) return <div>Loading...</div>
+    if(isLoading || loadingNotes) return <Loader fullscreen/>
     if(!isAuthenticated) redirect("/Login");
-    if(loadingNotes) return <div>Loading notes...</div>
 
     return (
     <div className="w-full p-4 grid grid-cols-3 gap-2 text-neutral-200">
-    {
-        notes.map((note: NoteType) => <Note key={note.id} {...note} onDelete={handleDeleteNote}/>)
-    }
-    { isAddingNote && <AddNoteForm onSubmit={handleNewNote}/> }
-    <button className="bg-neutral-700 w-12 h-12 text-xl rounded-full fixed bottom-4 right-4 hover:bg-neutral-600 hover:text-amber-400" onClick={() => setIsAddingNote(prev => !prev)}>+</button>
+        <button className="fixed top-4 right-4 bg-neutral-700 hover:bg-neutral-600 p-2 rounded-xl text-sm group" onClick={handleLogout}>
+            <LogoutIcon className="stroke-amber-600  w-6 h-6 group-hover:scale-110 transition-all"/>
+        </button>
+        {
+            notes.map((note: NoteType) => <Note key={note.id} {...note} onDelete={handleDeleteNote}/>)
+        }
+        { isAddingNote && <AddNoteForm onSubmit={handleNewNote}/> }
+        <button className="bg-neutral-700 w-12 h-12 text-xl rounded-full fixed bottom-4 right-4 hover:bg-neutral-600 hover:text-amber-400" onClick={() => setIsAddingNote(prev => !prev)}>+</button>
         <ToastContainer/>
     </div>
     );

@@ -3,12 +3,14 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using backend.Middlewares;
 using backend.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Net.Http.Headers;
 using Microsoft.OpenApi.Models;
@@ -42,6 +44,7 @@ builder.Services.AddSwaggerGen(opts => { // Add swagger configuration for JWT au
     });
 }); // Add swashbuckle services
 
+builder.Services.AddMemoryCache();
 builder.Services.AddDbContext<KeepContext>();
 builder.Services.AddScoped<PasswordHasher<User>>();
 builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
@@ -153,7 +156,7 @@ app.MapGet("/api/Account/Activate/{encodedUserName}", async (string encodedUserN
     return Results.Ok("The user has been activated successfully!");
 });
 
-app.MapPost("/api/Account/Login", async (UserLoginDto user, KeepContext _context, PasswordHasher<User> passwordHasher, HttpContext httpContext) =>
+app.MapPost("/api/Account/Login", async (UserLoginDto user, KeepContext _context, PasswordHasher<User> passwordHasher, IMemoryCache _memoryCache) =>
 {
     User foundUser;
     try
@@ -184,10 +187,21 @@ app.MapPost("/api/Account/Login", async (UserLoginDto user, KeepContext _context
     // var cookie = cookieOptions.CreateCookieHeader("token", token);
     // // response.Headers.Add(HeaderNames.SetCookie, cookie.ToString());
     // httpContext.Response.Headers.Append(HeaderNames.SetCookie, cookie.ToString());
+    _memoryCache.Set(foundUser.UserName, token, new MemoryCacheEntryOptions
+    {
+        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30)
+    });
     return Results.Ok(token);
 });
 
-app.MapPost("/api/Account/Logout", () => {
+app.MapPost("/api/Account/Logout", async (KeepContext _context, IHttpContextAccessor httpContextAccessor, IMemoryCache cache) => {
+    var context = httpContextAccessor.HttpContext;
+    var user = context.User;
+    User foundUser = await _context.Users.Include(u => u.Notes).Where(u => u.UserName == user.Identity.Name).FirstAsync();
+    if(foundUser == null || !foundUser.IsActive) {
+        return Results.NotFound();
+    }
+    cache.Remove(foundUser.UserName);
     return Results.Ok();
 }).RequireAuthorization();
 
@@ -245,6 +259,7 @@ app.MapDelete("/api/Notes/{noteId}",
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseVerifyTokenCache();
 app.Run();
 
 async Task SendConfirmationEmail(User user)
